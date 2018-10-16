@@ -9,11 +9,11 @@ import android.widget.TextView
 
 
 class QuizActivity : AppCompatActivity() {
-    private var mTrueButton: Button? = null
-    private var mFalseButton: Button? = null
-    private var mNextButton: Button? = null
-    private var mBackButton: Button? = null
-    private var mQuestionTextView: TextView? = null
+    private lateinit var mTrueButton: Button
+    private lateinit var mFalseButton: Button
+    private lateinit var mNextButton: Button
+    private lateinit var mBackButton: Button
+    private lateinit var mQuestionTextView: TextView
     private var mCurrentIndex: Int = 0
     private val mQuestionBank = arrayOf(
         Question(R.string.question_australia, true),
@@ -29,57 +29,57 @@ class QuizActivity : AppCompatActivity() {
         setContentView(R.layout.activity_quiz)
 
         mQuestionTextView = this.findViewById(R.id.txtViewQuestion)
-        mQuestionTextView?.setOnClickListener { _ ->
+        mQuestionTextView.setOnClickListener { _ ->
             toNextQuestion()
         }
         updateQuestion()
 
         mTrueButton = this.findViewById(R.id.btnTrue)
-        mTrueButton?.setOnClickListener(object : View.OnClickListener {
+        mTrueButton.setOnClickListener(object : View.OnClickListener {
             override fun onClick(v: View) {
                 checkAnswer(true)
             }
         })
 
         mFalseButton = this.findViewById(R.id.btnFalse)
-        mFalseButton?.setOnClickListener { _ ->
+        mFalseButton.setOnClickListener { _ ->
             checkAnswer(false)
         }
 
         mBackButton = this.findViewById(R.id.btnBack)
-        mBackButton?.setOnClickListener { _ ->
+        mBackButton.setOnClickListener { _ ->
             toBackQuestion()
         }
 
         mNextButton = this.findViewById(R.id.btnNext)
-        mNextButton?.setOnClickListener { _ ->
+        mNextButton.setOnClickListener { _ ->
             toNextQuestion()
         }
-        this.mBackButton?.isEnabled = false;
+        this.mBackButton.isEnabled = false;
     }
 
     private fun toBackQuestion() {
         this.mCurrentIndex = this.mCurrentIndex.dec()
         if (mCurrentIndex >= 1)
             updateQuestion()
-        if (mCurrentIndex < 0)
-            this.mBackButton?.isEnabled = false
+        if (mCurrentIndex <= 1)
+            this.mBackButton.isEnabled = false
         if (mCurrentIndex <= mQuestionBank.size - 1)
-            this.mNextButton?.isEnabled = true
+            this.mNextButton.isEnabled = true
     }
 
     private fun toNextQuestion() {
         if (++this.mCurrentIndex < mQuestionBank.size)
             updateQuestion()
         if (mCurrentIndex >= 1)
-            this.mBackButton?.isEnabled = true
-        if (mCurrentIndex > mQuestionBank.size)
-            this.mNextButton?.isEnabled = false
+            this.mBackButton.isEnabled = true
+        if (mCurrentIndex >= mQuestionBank.size - 1)
+            this.mNextButton.isEnabled = false
     }
 
     private fun updateQuestion() {
         val question: Int = mQuestionBank[mCurrentIndex].mTextResId
-        mQuestionTextView?.setText(question)
+        mQuestionTextView.setText(question)
     }
 
     private fun checkAnswer(userPressedTrue: Boolean) {
