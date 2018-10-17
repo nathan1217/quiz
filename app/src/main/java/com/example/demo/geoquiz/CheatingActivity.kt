@@ -11,6 +11,7 @@ import android.widget.TextView
 
 class CheatingActivity : AppCompatActivity() {
     private var mAnswerIsTrue: Boolean = false
+    private var mAnswerIsShow: Boolean = false
     private lateinit var mAnswerTxtView: TextView
     private lateinit var mShowAnswerBtn: Button
 
@@ -18,7 +19,8 @@ class CheatingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_cheating)
         mAnswerIsTrue = intent.getBooleanExtra(EXTRA_ANSWER_IS_TRUE, false)
-        mAnswerIsTrue = savedInstanceState?.getBoolean(ANSWER_SHOW, false) ?: false
+        mAnswerIsShow = savedInstanceState?.getBoolean(ANSWER_SHOW, false) ?: false
+        setAnswerShownResult(mAnswerIsShow)
         mAnswerTxtView = findViewById(R.id.answer_text_view)
         mShowAnswerBtn = findViewById(R.id.show_answer_button)
         mShowAnswerBtn.setOnClickListener { _ ->
