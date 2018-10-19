@@ -1,83 +1,84 @@
 package com.example.demo.geoquiz
 
 import android.app.Activity
-import android.support.v7.app.AppCompatActivity
+import android.arch.lifecycle.Observer
+import android.arch.lifecycle.ViewModelProvider
 import android.os.Bundle
 import android.util.Log
-import android.view.View
 import android.widget.Button
 import android.widget.Toast
 import android.widget.TextView
 import android.content.Intent
+import butterknife.*
+import dagger.android.support.DaggerAppCompatActivity
 
+class QuizActivity : DaggerAppCompatActivity() {
+    @BindView(R.id.btnTrue)
+    lateinit var mTrueButton: Button
+    @BindView(R.id.btnFalse)
+    lateinit var mFalseButton: Button
+    @BindView(R.id.btnNext)
+    lateinit var mNextButton: Button
+    @BindView(R.id.btnBack)
+    lateinit var mBackButton: Button
+    @BindView(R.id.txtViewQuestion)
+    lateinit var mQuestionTextView: TextView
+    @BindString(R.string.question_oceans)
+    lateinit var mEmptyQuestion: String
 
-class QuizActivity : AppCompatActivity() {
-    private lateinit var mTrueButton: Button
-    private lateinit var mFalseButton: Button
-    private lateinit var mNextButton: Button
-    private lateinit var mBackButton: Button
-    private lateinit var mCheatingButton: Button
-    private lateinit var mQuestionTextView: TextView
-    private var mCurrentIndex: Int = 0
-    private lateinit var mQuestionBank: Array<Question>
+    private lateinit var mViewModel: QuestionViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(LOG_TAG, "onCreate")
         setContentView(R.layout.activity_quiz)
-        mCurrentIndex = savedInstanceState?.getInt(KEY_INDEX, 0) ?: 0
-        mQuestionBank = savedInstanceState?.getParcelableArray(KEY_QUESTION_ARRAY) as Array<Question>? ?: arrayOf(
-            Question(R.string.question_australia, true),
-            Question(R.string.question_oceans, true),
-            Question(R.string.question_mideast, false),
-            Question(R.string.question_africa, false),
-            Question(R.string.question_americas, true),
-            Question(R.string.question_asia, true)
-        )
 
-        mQuestionTextView = this.findViewById(R.id.txtViewQuestion)
-        mQuestionTextView.setOnClickListener { _ ->
-            toNextQuestion()
-        }
-
-        mTrueButton = this.findViewById(R.id.btnTrue)
-        mTrueButton.setOnClickListener(object : View.OnClickListener {
-            override fun onClick(v: View) {
-                checkAnswer(true)
-            }
+        mViewModel = ViewModelProvider(
+            this, ViewModelProvider.AndroidViewModelFactory(application)
+        ).get(QuestionViewModel::class.java)
+        mViewModel.getQuestion().observe(this, Observer<Pagination<Question>> { question ->
+            mQuestionTextView.setText(question?.data?.mTextResId ?: mEmptyQuestion.toInt())
+            togglePageBtn(question)
+            toggleAnswerBtn(question)
         })
+        ButterKnife.bind(this)
+        mViewModel.loadQuestion()
+    }
 
-        mFalseButton = this.findViewById(R.id.btnFalse)
-        mFalseButton.setOnClickListener { _ ->
-            checkAnswer(false)
+    private fun togglePageBtn(question: Pagination<Question>?) {
+        val pageIndex = question?.currentIndex ?: 0
+        val count = question?.totalCount ?: 0
+        when {
+            pageIndex <= 0 -> mBackButton.isEnabled = false
         }
-
-        mBackButton = this.findViewById(R.id.btnBack)
-        mBackButton.setOnClickListener { _ ->
-            toBackQuestion()
+        when {
+            pageIndex > 0 -> mBackButton.isEnabled = true
         }
-
-        mNextButton = this.findViewById(R.id.btnNext)
-        mNextButton.setOnClickListener { _ ->
-            toNextQuestion()
+        when {
+            pageIndex >= count - 1 -> {
+                mNextButton.isEnabled = false
+                mQuestionTextView.isClickable = false
+            }
         }
-
-        mCheatingButton = this.findViewById(R.id.btnCheating)
-        mCheatingButton.setOnClickListener { _ ->
-            startActivityForResult(
-                CheatingActivity.newIntent(
-                    this@QuizActivity,
-                    mQuestionBank[mCurrentIndex].mAnswerTrue
-                )
-                , REQUEST_CODE_CHEAT
-            )
+        when {
+            pageIndex < count - 1 -> {
+                mNextButton.isEnabled = true
+                mQuestionTextView.isClickable = true
+            }
         }
+    }
 
-        updateQuestion()
-        if (mCurrentIndex <= 0)
-            this.mBackButton.isEnabled = false
-        if (mCurrentIndex >= mQuestionBank.size - 1)
-            this.mNextButton.isEnabled = false
+    private fun toggleAnswerBtn(question: Pagination<Question>?) {
+        when (question?.data?.isAnswered) {
+            true -> {
+                this.mFalseButton.isEnabled = false
+                this.mTrueButton.isEnabled = false
+            }
+            else -> {
+                this.mFalseButton.isEnabled = true
+                this.mTrueButton.isEnabled = true
+            }
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -88,8 +89,8 @@ class QuizActivity : AppCompatActivity() {
                     null -> return
                     else -> {
                         var isCheater: Boolean = CheatingActivity.wasAnswerShown(data)
-                        var question: Question = mQuestionBank[mCurrentIndex]
-                        question.isCheating = isCheater
+                        var question: Question? = mViewModel.getQuestion().value?.data
+                        question?.isCheating = isCheater
                     }
                 }
             }
@@ -99,8 +100,6 @@ class QuizActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle?) {
         super.onSaveInstanceState(outState)
         Log.d(LOG_TAG, "onSaveInstanceState")
-        outState?.putInt(KEY_INDEX, mCurrentIndex)
-        outState?.putParcelableArray(KEY_QUESTION_ARRAY, mQuestionBank)
     }
 
     override fun onStart() {
@@ -128,33 +127,44 @@ class QuizActivity : AppCompatActivity() {
         Log.d(LOG_TAG, "onDestroy")
     }
 
-    private fun toBackQuestion() {
-        this.mCurrentIndex = this.mCurrentIndex.dec()
-        if (mCurrentIndex >= 0)
-            updateQuestion()
-        if (mCurrentIndex <= 0)
-            this.mBackButton.isEnabled = false
-        if (mCurrentIndex <= mQuestionBank.size - 1)
-            this.mNextButton.isEnabled = true
+    @OnClick(R.id.btnBack)
+    fun toBackQuestion() {
+        mViewModel.previousQuestion()
     }
 
-    private fun toNextQuestion() {
-        if (this.mCurrentIndex++ < mQuestionBank.size - 1)
-            updateQuestion()
-        if (mCurrentIndex >= 1)
-            this.mBackButton.isEnabled = true
-        if (mCurrentIndex >= mQuestionBank.size - 1)
-            this.mNextButton.isEnabled = false
+    @OnClick(R.id.btnCheating)
+    fun cheating() {
+        startActivityForResult(
+            CheatingActivity.newIntent(
+                this@QuizActivity,
+                (mViewModel.getQuestion().value?.data as Question).mAnswerTrue
+            )
+            , REQUEST_CODE_CHEAT
+        )
     }
 
-    private fun updateQuestion() {
-        val question: Question = mQuestionBank[mCurrentIndex]
-        mQuestionTextView.setText(question.mTextResId)
-        toggleBtnAnswer(question)
+    @OnClick(R.id.btnNext)
+    fun bindNextActionToBtn() {
+        mViewModel.nextQuestion()
+    }
+
+    @OnClick(R.id.txtViewQuestion)
+    fun bindNextActionToTxt() {
+        mViewModel.nextQuestion()
+    }
+
+    @OnClick(R.id.btnTrue)
+    fun checkTrue() {
+        checkAnswer(true)
+    }
+
+    @OnClick(R.id.btnFalse)
+    fun checkFalse() {
+        checkAnswer(false)
     }
 
     private fun checkAnswer(userPressedTrue: Boolean) {
-        val question: Question = mQuestionBank[mCurrentIndex]
+        val question: Question = mViewModel.getQuestion().value?.data as Question
         val answerIsTrue: Boolean = question.mAnswerTrue
         question.isAnswered = true
         var msgResId: Int = when {
@@ -166,28 +176,13 @@ class QuizActivity : AppCompatActivity() {
                 }
             }
         }
-        toggleBtnAnswer(question)
+        toggleAnswerBtn(mViewModel.getQuestion().value)
         Toast.makeText(this, msgResId, Toast.LENGTH_SHORT).show()
-//        Toast.makeText(this, mQuestionBank.count { q ->
-//            q.getAnswerTag()
-//        }.toString(), Toast.LENGTH_LONG).show()
-    }
-
-    private fun toggleBtnAnswer(question: Question) {
-        if (question.isAnswered) {
-            this.mFalseButton.isEnabled = false
-            this.mTrueButton.isEnabled = false
-        } else {
-            this.mFalseButton.isEnabled = true
-            this.mTrueButton.isEnabled = true
-        }
     }
 
 
     companion object {
         private const val REQUEST_CODE_CHEAT: Int = 1
         private const val LOG_TAG: String = "QuizActivity"
-        private const val KEY_INDEX: String = "currentIndex"
-        private const val KEY_QUESTION_ARRAY: String = "currentQuestionArray"
     }
 }
